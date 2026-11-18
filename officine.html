@@ -163,6 +163,17 @@ button.tag:hover{border-color:var(--brand)}
 #orgnew:focus{border-color:var(--brand)}
 .selbar .mnum svg{width:16px;height:16px}
 @media (pointer:coarse){.chip{padding:11px 16px}}
+/* panneau de sélection à droite sur grand écran : la liste reste libre pour défiler */
+@media (min-width:1000px){
+  #main:has(.selbar){padding-right:336px}
+  #marksbar:has(.selbar){position:fixed;top:84px;right:max(16px,calc((100vw - 1280px)/2 + 16px));width:316px;max-height:calc(100vh - 100px);overflow-y:auto;z-index:15;border-radius:16px}
+  #marksbar .selbar{margin:0}
+  #marksbar .selrow.vals{max-height:none}
+  #marksbar .selbar .btn{flex:1 1 100%}
+  #marksbar .selbar .selrow>span[style*="flex:1"]{display:none}
+  #marksbar #selnote,#marksbar #orgnew{flex:1 1 100%;min-width:0}
+  #marksbar .selcount{margin-left:0;flex:1 1 100%}
+}
 /* ---------- écrans tactiles ---------- */
 html{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 button,.card{-webkit-user-select:none;user-select:none}
