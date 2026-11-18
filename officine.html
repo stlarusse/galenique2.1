@@ -156,6 +156,13 @@ button.tag:hover{border-color:var(--brand)}
 #selnote:focus{border-color:var(--brand)}
 .tag.mk{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--mc);font-weight:600}
 .tag.mk i{font-style:normal;display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:99px;background:var(--mc);color:var(--mt);font-weight:800;font-size:.8rem}
+.chip{padding:8px 14px;border-radius:99px;border:1.5px solid var(--line);background:#fff;font-weight:600}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.selrow.vals{max-height:132px;overflow-y:auto}
+#orgnew{flex:1;min-width:160px;border:1.5px solid var(--line);border-radius:99px;padding:9px 14px;outline:0}
+#orgnew:focus{border-color:var(--brand)}
+.selbar .mnum svg{width:16px;height:16px}
+@media (pointer:coarse){.chip{padding:11px 16px}}
 /* ---------- écrans tactiles ---------- */
 html{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 button,.card{-webkit-user-select:none;user-select:none}
@@ -318,9 +325,10 @@ const $side=document.getElementById("side"), $main=document.getElementById("main
 
 function groups(get){const c={};meds.forEach(m=>get(m).forEach(k=>{if(k)c[k]=(c[k]||0)+1}));return Object.entries(c).sort((a,b)=>a[0].localeCompare(b[0],"fr"));}
 const squash=s=>norm(s).replace(/[\s\-'’./]+/g,"");
-function hay(m){return [m.nom,m.dci,m.forme,m.cat,m.emplacement,(m.classe||[]).join(" "),(m.sympt||[]).join(" "),(m.tags||[]).join(" ")].join(" ");}
+const arr=v=>Array.isArray(v)?v:(v?[v]:[]);
+function hay(m){return [m.nom,m.dci,m.forme,arr(m.cat).join(" "),m.emplacement,(m.classe||[]).join(" "),(m.sympt||[]).join(" "),(m.tags||[]).join(" ")].join(" ");}
 function matches(m,q){const h=norm(hay(m));if(q.split(/\s+/).every(w=>h.includes(w)))return true;const sq=squash(q);return sq.length>2&&squash(hay(m)).includes(sq);}
-function cats(){const c={};meds.forEach(m=>{const k=m.cat||"Sans catégorie";c[k]=(c[k]||0)+1});return Object.entries(c).sort((a,b)=>a[0].localeCompare(b[0],"fr"));}
+function cats(){const c={};meds.forEach(m=>{(arr(m.cat).length?arr(m.cat):["Sans catégorie"]).forEach(k=>{c[k]=(c[k]||0)+1})});return Object.entries(c).sort((a,b)=>a[0].localeCompare(b[0],"fr"));}
 
 function visible(){
   let l=meds.slice();
@@ -328,7 +336,7 @@ function visible(){
   if(f==="fav") l=l.filter(m=>m.fav);
   else if(f==="recent") l=l.filter(m=>m.viewed).sort((a,b)=>b.viewed-a.viewed).slice(0,12);
   else if(f==="todo") l=l.filter(m=>filled(m)===0);
-  else if(f.startsWith("cat:")) l=l.filter(m=>(m.cat||"Sans catégorie")===f.slice(4));
+  else if(f.startsWith("cat:")) l=l.filter(m=>(arr(m.cat).length?arr(m.cat):["Sans catégorie"]).includes(f.slice(4)));
   else if(f.startsWith("cls:")) l=l.filter(m=>(m.classe||[]).includes(f.slice(4)));
   else if(f.startsWith("sym:")) l=l.filter(m=>(m.sympt||[]).some(s=>norm(s).includes(norm(f.slice(4)))));
   else if(f.startsWith("loc:")) l=l.filter(m=>(m.emplacement||"")===f.slice(4));
@@ -372,13 +380,14 @@ function renderList(){
   const title={all:"Tous les médicaments",fav:"Favoris",recent:"Consultés récemment",todo:"Fiches à compléter"}[ui.filter]||(ui.filter.startsWith("loc:")?"Emplacement ":"")+ui.filter.slice(4);
   $main.innerHTML=banner()+`
   <div class="searchrow">
-    <label class="search">${I(IC.search)}<input id="q" type="search" placeholder="Nom, DCI, classe (ex. antitussif), symptôme (ex. toux sèche), emplacement…" value="${esc(ui.q)}" autocomplete="off" ${ui.sel?"disabled":""}></label>
+    <label class="search">${I(IC.search)}<input id="q" type="search" placeholder="Nom, DCI, classe (ex. antitussif), symptôme (ex. toux sèche), emplacement…" value="${esc(ui.q)}" autocomplete="off" ${ui.sel||ui.org?"disabled":""}></label>
   </div>
   <p class="count"><b>${esc(title)}</b> · ${l.length} fiche${l.length>1?"s":""}</p>
   <div id="marksbar">${marksBarHtml(l)}</div>
   <div id="grid">${gridHtml(l)}</div>`;
 }
 function marksBarHtml(l){
+  if(ui.org) return orgBarHtml();
   if(ui.sel){const s=ui.sel;return `<div class="selbar" style="${mstyle(s.color)}">
     <div class="selrow"><span class="mnum">${s.num}</span><b>Touche les produits à mettre dans ce groupe</b><span class="selcount">${s.ids.size} sélectionné${s.ids.size>1?"s":""}</span></div>
     <div class="selrow"><span class="lab">Couleur</span>${Object.keys(COL).map(c=>`<button class="sw ${c===s.color?"on":""}" data-selcolor="${c}" style="--c:${COL[c]}" aria-label="${c}" title="${c}"></button>`).join("")}
@@ -389,15 +398,42 @@ function marksBarHtml(l){
   const gs=ctxMarks(), ex=id=>meds.some(m=>m.id===id);
   return `<div class="mlegend">${gs.map(g=>`<div class="mgroup" style="${mstyle(g.color)}"><span class="mnum">${g.num}</span><span class="mtxt">${g.note?esc(g.note):"<i>Sans note</i>"}<small>${g.medIds.filter(ex).length} produit${g.medIds.filter(ex).length>1?"s":""}</small></span>
       <button class="icon-btn" data-medit="${esc(g.id)}" aria-label="Modifier le groupe ${g.num}">${I(IC.pen)}</button><button class="icon-btn" data-mdel="${esc(g.id)}" aria-label="Supprimer le groupe ${g.num}">${I(IC.trash)}</button></div>`).join("")}
-    <button class="btn" data-act="selstart">${I(IC.palette)}${gs.length?"Ajouter un groupe":"Classer des produits (couleur + numéro)"}</button></div>`;
+    <button class="btn" data-act="selstart">${I(IC.palette)}${gs.length?"Ajouter un groupe":"Classer des produits (couleur + numéro)"}</button>
+    <button class="btn" data-act="orgstart">${I(IC.folder)}Ranger / déplacer des produits</button></div>`;
 }
+const ORG={cat:["Catégorie","cat"],sym:["Symptôme","sympt"],cls:["Classe","classe"],loc:["Emplacement","emplacement"]};
+function orgHere(){const p=ui.filter.slice(0,3),v=ui.filter.slice(4);return ORG[p]&&ui.filter[3]===":"&&v!=="Sans catégorie"&&!ui.q.trim()?{type:p,val:v}:null;}
+function orgValues(type){return type==="cat"?cats().map(x=>x[0]).filter(x=>x!=="Sans catégorie"):groups(m=>arr(m[ORG[type][1]])).map(x=>x[0]);}
+function orgBarHtml(){const o=ui.org,here=orgHere(),multi=o.type!=="loc";
+  return `<div class="selbar" style="--mc:var(--brand);--mt:#fff">
+    <div class="selrow"><span class="mnum">${I(IC.folder)}</span><b>Touche les produits à ranger</b><span class="selcount">${o.ids.size} sélectionné${o.ids.size>1?"s":""}</span></div>
+    <div class="selrow"><span class="lab">Ranger dans</span>${Object.entries(ORG).map(([k,[lab]])=>`<button class="chip ${o.type===k?"on":""}" data-orgtype="${k}">${lab}</button>`).join("")}</div>
+    <div class="selrow vals">${orgValues(o.type).map(v=>`<button class="chip val ${norm(o.val)===norm(v)?"on":""}" data-orgval="${esc(v)}">${esc(v)}</button>`).join("")}
+      <input id="orgnew" placeholder="ou nouveau nom…" value="${orgValues(o.type).some(v=>norm(v)===norm(o.val))?"":esc(o.val)}" autocomplete="off"></div>
+    <div class="selrow"><button class="btn" data-act="orgcancel">Annuler</button>
+      ${here?`<button class="btn danger" data-act="orgremove">${I(IC.x)}Retirer de « ${esc(here.val)} »</button>`:""}
+      <span style="flex:1"></span>
+      ${multi?`<button class="btn" data-act="orgadd">${I(IC.plus)}Ajouter aussi dans ce choix</button>`:""}
+      <button class="btn primary" data-act="orgmove">${I(IC.check)}${multi?(here&&here.type===o.type?"Déplacer vers ce choix":"Mettre uniquement dans ce choix"):"Mettre à cet emplacement"}</button></div></div>`;}
+function orgApply(mode){const o=ui.org,f=ORG[o.type][1],val=o.val.trim(),here=orgHere();
+  if(!o.ids.size){alert("Touche d'abord au moins un produit.");return;}
+  if(mode!=="remove"&&!val){alert("Choisis où ranger : touche un nom ou écris-en un nouveau.");return;}
+  const same=(a,b)=>norm(a)===norm(b);
+  for(const m of meds.filter(m=>o.ids.has(m.id))){
+    if(mode==="remove"){const hf=ORG[here.type][1]; if(here.type==="loc"){if(same(m.emplacement,here.val))m.emplacement="";} else m[hf]=arr(m[hf]).filter(v=>!same(v,here.val));}
+    else if(o.type==="loc") m.emplacement=val;
+    else{let a=arr(m[f]);
+      if(mode==="move") a=here&&here.type===o.type?a.filter(v=>!same(v,here.val)):[];
+      if(!a.some(v=>same(v,val))) a.push(val); m[f]=a;}
+    put("meds",m);}
+  ui.org=null;render();}
 function refreshList(){const l=visible();document.getElementById("grid").innerHTML=gridHtml(l);document.getElementById("marksbar").innerHTML=marksBarHtml(l);
   document.querySelector(".count").lastChild.textContent=` · ${l.length} fiche${l.length>1?"s":""}`;}
 function gridHtml(l){
   const gs=ctxMarks();
   if(!l.length) return `<div class="empty">Aucune fiche ici.<br><br><button class="btn primary" data-act="new">${I(IC.plus)}Ajouter un médicament</button></div>`;
-  return `<div class="grid">`+l.map(m=>{const n=filled(m),g=markOf(m.id,gs),sel=!!ui.sel&&ui.sel.ids.has(m.id),mk=sel?ui.sel:g;return `
-    <button class="card ${mk?"marked":""} ${sel?"sel":""} ${ui.sel&&!sel?"pick":""}" ${mk?`style="${mstyle(mk.color)}"`:""} data-open="${esc(m.id)}">${mk?`<span class="mnum">${mk.num}</span>`:""}
+  return `<div class="grid">`+l.map(m=>{const n=filled(m),g=markOf(m.id,gs),osel=!!ui.org&&ui.org.ids.has(m.id),sel=osel||(!!ui.sel&&ui.sel.ids.has(m.id)),mk=osel?{num:"✓"}:sel?ui.sel:g;return `
+    <button class="card ${mk?"marked":""} ${sel?"sel":""} ${(ui.sel||ui.org)&&!sel?"pick":""}" ${mk?`style="${osel?"--mc:#8a1538;--mt:#fff":mstyle(mk.color)}"`:""} data-open="${esc(m.id)}">${mk?`<span class="mnum">${mk.num}</span>`:""}
       ${m.fav?`<span class="heart">${I(IC.heart)}</span>`:""}
       ${m.grossesse?`<span class="pregb" title="Grossesse : ${esc(PREG[m.grossesse][0])}">${pregIcon(m.grossesse,26)}</span>`:""}
       <div class="ph">${photoBox(m)}</div>
@@ -426,7 +462,7 @@ function renderDetail(){
         <button class="icon-btn fav-btn ${m.fav?"on":""}" data-act="fav" aria-label="Favori" title="Favori" style="color:var(--brand);background:#fff;border:1px solid var(--line);width:44px;height:44px;border-radius:50%">${I(IC.heart)}</button></div>
       ${m.dci?`<p class="dci"><b>DCI :</b> ${esc(m.dci)}</p>`:`<p class="dci" style="color:var(--muted)">DCI à renseigner</p>`}
       ${m.forme?`<p class="forme">${esc(m.forme)}</p>`:""}
-      <div class="tags">${m.emplacement?`<button class="tag locb" data-filter="loc:${esc(m.emplacement)}">${I(IC.pin)}Emplacement ${esc(m.emplacement)}</button>`:""}${m.cat?`<button class="tag cat" data-filter="cat:${esc(m.cat)}">${esc(m.cat)}</button>`:""}${(m.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>
+      <div class="tags">${m.emplacement?`<button class="tag locb" data-filter="loc:${esc(m.emplacement)}">${I(IC.pin)}Emplacement ${esc(m.emplacement)}</button>`:""}${arr(m.cat).map(c=>`<button class="tag cat" data-filter="cat:${esc(c)}">${esc(c)}</button>`).join("")}${(m.tags||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>
       ${(m.classe||[]).length?`<p class="kv"><b>Classe</b>${m.classe.map(t=>`<button class="tag cls" data-filter="cls:${esc(t)}">${esc(t)}</button>`).join("")}</p>`:""}
       ${(m.sympt||[]).length?`<p class="kv"><b>Symptômes</b>${m.sympt.map(t=>`<button class="tag" data-find="${esc(t)}">${esc(t)}</button>`).join("")}</p>`:""}
       ${marks.some(g=>g.medIds.includes(m.id))?`<p class="kv"><b>Classements</b>${marks.filter(g=>g.medIds.includes(m.id)).map(g=>`<span class="tag mk" style="${mstyle(g.color)}"><i>${g.num}</i>${esc(g.label||"")}${g.note?" — "+esc(g.note):""}</span>`).join("")}</p>`:""}
@@ -471,7 +507,7 @@ function render(){
    ===================================================================== */
 function route(){
   const h=decodeURIComponent(location.hash.slice(1));
-  ui.editing=null; ui.jedit=null; ui.sel=null;
+  ui.editing=null; ui.jedit=null; ui.sel=null; ui.org=null;
   if(h==="carnet"){ui.tab="carnet";ui.openId=null;}
   else if(h.startsWith("m/")){
     ui.tab="meds"; const id=h.slice(2);
@@ -488,11 +524,12 @@ function current(){return meds.find(x=>x.id===ui.openId);}
 function touch(m){m.updated=Date.now();put("meds",m);}
 
 document.addEventListener("click",e=>{
-  const t=e.target.closest("[data-tab],[data-filter],[data-open],[data-act],[data-edit],[data-photo],[data-jedit],[data-jdel],[data-preg],[data-find],[data-selcolor],[data-selnum],[data-medit],[data-mdel]");
+  const t=e.target.closest("[data-tab],[data-filter],[data-open],[data-act],[data-edit],[data-photo],[data-jedit],[data-jdel],[data-preg],[data-find],[data-selcolor],[data-selnum],[data-medit],[data-mdel],[data-orgtype],[data-orgval]");
   if(!t) return;
   const d=t.dataset, m=current();
   if(d.tab){location.hash=d.tab==="carnet"?"carnet":"";return;}
-  if(d.filter){ui.sel=null;ui.filter=d.filter;ui.q="";if(location.hash) location.hash=""; else render();return;}
+  if(d.filter){ui.sel=null;ui.org=null;ui.filter=d.filter;ui.q="";if(location.hash) location.hash=""; else render();return;}
+  if(d.open&&ui.org){ui.org.ids.has(d.open)?ui.org.ids.delete(d.open):ui.org.ids.add(d.open);refreshList();return;}
   if(d.open&&ui.sel){ui.sel.ids.has(d.open)?ui.sel.ids.delete(d.open):ui.sel.ids.add(d.open);refreshList();return;}
   if(d.open){location.hash="m/"+encodeURIComponent(d.open);return;}
   if(d.preg!==undefined){m.grossesse=d.preg;touch(m);renderDetail();return;}
@@ -501,6 +538,8 @@ document.addEventListener("click",e=>{
   if(d.photo){ui.photoIx=+d.photo;renderDetail();return;}
   if(d.jedit){ui.jedit=d.jedit;renderCarnet();return;}
   if(d.jdel){if(confirm("Supprimer cette note ?")){journal=journal.filter(j=>j.id!==d.jdel);del("journal",d.jdel);renderCarnet();}return;}
+  if(d.orgtype){ui.org.type=d.orgtype;ui.org.val="";refreshList();return;}
+  if(d.orgval){ui.org.val=d.orgval;refreshList();return;}
   if(d.selcolor){ui.sel.color=d.selcolor;refreshList();return;}
   if(d.selnum){ui.sel.num=Math.max(1,Math.min(99,ui.sel.num+(+d.selnum)));refreshList();return;}
   if(d.medit){const g=marks.find(x=>x.id===d.medit);ui.sel={id:g.id,ctx:g.ctx,label:g.label,ids:new Set(g.medIds),color:g.color,num:g.num,note:g.note||""};renderList();return;}
@@ -508,6 +547,11 @@ document.addEventListener("click",e=>{
   switch(d.act){
     case "selstart": {const gs=ctxMarks(),used=gs.map(g=>g.color);
       ui.sel={id:null,ctx:ctxKey(),label:ctxLabel(),ids:new Set(),color:Object.keys(COL).find(c=>!used.includes(c))||"jaune",num:gs.reduce((a,g)=>Math.max(a,g.num),0)+1,note:""};renderList();break;}
+    case "orgstart": {const h=orgHere();ui.org={ids:new Set(),type:h?h.type:"cat",val:""};renderList();break;}
+    case "orgcancel": ui.org=null; renderList(); break;
+    case "orgadd": orgApply("add"); break;
+    case "orgmove": orgApply("move"); break;
+    case "orgremove": if(!ui.org.ids.size){alert("Touche d'abord au moins un produit.");break;} orgApply("remove"); break;
     case "selcancel": ui.sel=null; renderList(); break;
     case "selsave": {const s=ui.sel; if(!s.ids.size){alert("Touche d'abord au moins un produit.");break;}
       for(const g of marks.filter(g=>g.ctx===s.ctx&&g.id!==s.id)){const k=g.medIds.filter(id=>!s.ids.has(id));
@@ -532,6 +576,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("input",e=>{
   const t=e.target;
   if(t.id==="q"){ui.q=t.value;refreshList();return;}
+  if(t.id==="orgnew"){ui.org.val=t.value;document.querySelectorAll(".chip.val.on").forEach(e=>e.classList.remove("on"));return;}
   if(t.id==="selnote"){ui.sel.note=t.value;return;}
   if(t.dataset.sec){const m=current();m.sections[t.dataset.sec]=t.value;touch(m);return;}
   if(t.dataset.jtext){const j=journal.find(x=>x.id===t.dataset.jtext);j.text=t.value;put("journal",j);}
@@ -554,13 +599,13 @@ document.getElementById("filePhoto").addEventListener("change",async e=>{
 
 /* ----- formulaire fiche ----- */
 function openForm(m){
-  const isNew=!m; m=m||{nom:"",dci:"",forme:"",cat:ui.filter.startsWith("cat:")?ui.filter.slice(4):"",tags:[],classe:[],sympt:[],emplacement:ui.filter.startsWith("loc:")?ui.filter.slice(4):""};
+  const isNew=!m; m=m||{nom:"",dci:"",forme:"",cat:ui.filter.startsWith("cat:")&&ui.filter!=="cat:Sans catégorie"?[ui.filter.slice(4)]:[],tags:[],classe:[],sympt:[],emplacement:ui.filter.startsWith("loc:")?ui.filter.slice(4):""};
   $dlg.innerHTML=`<form method="dialog" id="medForm">
     <h2>${isNew?"Nouveau médicament":"Modifier la fiche"}</h2>
     <label>Nom commercial<input name="nom" required value="${esc(m.nom)}" placeholder="ex. Dafalgan 1 g"></label>
     <label>DCI (substance active)<input name="dci" value="${esc(m.dci)}" placeholder="ex. Paracétamol 1 g"></label>
     <label>Forme / conditionnement<input name="forme" value="${esc(m.forme)}" placeholder="ex. 30 comprimés pelliculés"></label>
-    <label>Catégorie<input name="cat" list="catlist" value="${esc(m.cat)}" placeholder="ex. Douleur & fièvre">
+    <label>Catégories <small>plusieurs possibles, séparées par des virgules</small><input name="cat" value="${esc(arr(m.cat).join(", "))}" placeholder="ex. Toux sèche, Gorge">
       <datalist id="catlist">${cats().map(([c])=>`<option value="${esc(c)}">`).join("")}</datalist></label>
     <label>Classe <small>séparées par des virgules</small><input name="classe" value="${esc((m.classe||[]).join(", "))}" placeholder="ex. Antihistaminique"></label>
     <label>Symptômes <small>séparés par des virgules</small><input name="sympt" value="${esc((m.sympt||[]).join(", "))}" placeholder="ex. Rhume des foins, Urticaire"></label>
@@ -578,7 +623,7 @@ function openForm(m){
     meds=meds.filter(x=>x.id!==m.id);del("meds",m.id);$dlg.close();location.hash="";render();};
   document.getElementById("medForm").onsubmit=()=>{
     const f=new FormData(document.getElementById("medForm")),g=k=>String(f.get(k)||"").trim();
-    const data={nom:g("nom"),dci:g("dci"),forme:g("forme"),cat:g("cat"),emplacement:g("emplacement"),...Object.fromEntries(["tags","classe","sympt"].map(k=>[k,g(k).split(",").map(s=>s.trim()).filter(Boolean)]))};
+    const data={nom:g("nom"),dci:g("dci"),forme:g("forme"),emplacement:g("emplacement"),...Object.fromEntries(["cat","tags","classe","sympt"].map(k=>[k,g(k).split(",").map(s=>s.trim()).filter(Boolean)]))};
     if(isNew){const n={id:"u"+Date.now(),...data,grossesse:"",photos:[],fav:false,sections:{},updated:0,viewed:0};meds.push(n);put("meds",n);location.hash="m/"+n.id;}
     else{Object.assign(m,data);put("meds",m);render();}
   };
@@ -602,7 +647,7 @@ document.getElementById("fileImport").addEventListener("change",async e=>{
     const d=JSON.parse(await f.text());
     if(d.app!=="mon-comptoir"||!Array.isArray(d.meds)) throw 0;
     if(!confirm(`Restaurer ${d.meds.length} fiches et ${(d.journal||[]).length} notes de carnet ?\nLes fiches du même nom d'origine seront remplacées par celles du fichier.`)) return;
-    for(const m of d.meds){ if(!m||!m.id||!m.nom) continue; m.sections=m.sections||{};m.photos=m.photos||[];m.tags=m.tags||[];
+    for(const m of d.meds){ if(!m||!m.id||!m.nom) continue; m.cat=arr(m.cat);m.classe=m.classe||[];m.sympt=m.sympt||[];m.sections=m.sections||{};m.photos=m.photos||[];m.tags=m.tags||[];
       const i=meds.findIndex(x=>x.id===m.id); if(i>=0) meds[i]=m; else meds.push(m); await put("meds",m); }
     for(const j of d.journal||[]){ if(!j||!j.id) continue; const i=journal.findIndex(x=>x.id===j.id); if(i>=0) journal[i]=j; else journal.push(j); await put("journal",j); }
     for(const g of d.marks||[]){ if(!g||!g.id||!Array.isArray(g.medIds)) continue; marks=marks.filter(x=>x.id!==g.id); marks.push(g); await put("marks",g); }
@@ -629,7 +674,7 @@ document.getElementById("fileImport").addEventListener("change",async e=>{
     }
     if(navigator.storage&&navigator.storage.persist) navigator.storage.persist();
   }catch(e){ persist=false; meds=SEED.map(m=>JSON.parse(JSON.stringify(m))); }
-  meds.forEach(m=>{m.sections=m.sections||{};m.classe=m.classe||[];m.sympt=m.sympt||[];m.photos=(m.photos||[]).filter(p=>img(p));});
+  meds.forEach(m=>{m.cat=arr(m.cat);m.sections=m.sections||{};m.classe=m.classe||[];m.sympt=m.sympt||[];m.photos=(m.photos||[]).filter(p=>img(p));});
   route();
 })();
 </script>
