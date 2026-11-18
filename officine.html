@@ -402,7 +402,7 @@ function gridHtml(l){
       ${m.grossesse?`<span class="pregb" title="Grossesse : ${esc(PREG[m.grossesse][0])}">${pregIcon(m.grossesse,26)}</span>`:""}
       <div class="ph">${photoBox(m)}</div>
       <div class="tx"><b>${esc(m.nom)}</b><small>${esc(m.dci||m.forme||" ")}</small>
-      ${m.emplacement?`<span class="loc">${I(IC.pin)}${esc(m.emplacement)}</span>`:""}${g&&g.note&&!sel?`<span class="mnote">${esc(g.note)}</span>`:""}<div class="dots"><span class="bar"><i style="width:${n/SECTIONS.length*100}%"></i></span>${n}/${SECTIONS.length} notes</div></div>
+      ${m.emplacement?`<span class="loc">${I(IC.pin)}${esc(m.emplacement)}</span>`:""}${g&&g.note&&!sel?`<span class="mnote">${esc(g.note)}</span>`:""}</div>
     </button>`}).join("")+`</div>`;
 }
 
